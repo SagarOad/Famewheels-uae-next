@@ -186,7 +186,7 @@ const TopSlider = () => {
         <div className="SliderSearchBar">
           <div className="container">
             <div className="SliderSearchBar_bg">
-              <h4>Find Your Right Car Here</h4>
+              <h4>Find Your Right Car Hersse</h4>
               <ul
                 className="nav nav-pills mt-3 sliderSearchTabs"
                 id="pills-tab"

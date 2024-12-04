@@ -65,9 +65,9 @@ export default function NumberLogin() {
     setFBaccessToken(response);
   };
 
-  // const handleSuccess = (response) => {
-  //   handleFacebookLogin(response);
-  // };
+  const handleSuccess = (response) => {
+    handleFacebookLogin(response);
+  };
 
   const handleError = (error) => {
     // console.log(error?.status, " facebook error  ");
@@ -118,33 +118,20 @@ export default function NumberLogin() {
   const handleRegister = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     try {
-      const formData = new FormData();
-      formData.append("user_name", name);
-      formData.append("email", email);
-      formData.append("password", password);
-      formData.append("phone", phone);
-
-      console.log("Form Data:", { name, email, password, phone });
-
-      const response = await axios.post(`${baseUrl}/signup`, formData);
-
-      if (response?.status === 200) {
-        handleLogin(); // Trigger login if signup is successful
-      } else {
-        setError("Failed to register.");
-      }
-    } catch (err) {
-      console.error("Signup Error:", err.response?.data);
-      setError(
-        err.response?.data?.error || "An error occurred during registration."
-      );
-    } finally {
+      const emailVerify = await axios.get(`${baseUrl}/sendotp`, {
+        params: {
+          login_type: "phone",
+          phone: phoneNo,
+        },
+      });
+      setOtpPopup(true);
       setIsSubmitting(false);
+    } catch (error) {
+      setIsSubmitting(false);
+      console.error(error);
     }
   };
-
   const handleRegisterViaEmail = async (e) => {
     e.preventDefault();
     setIsSignSubmitting(true);
@@ -187,20 +174,221 @@ export default function NumberLogin() {
     e.preventDefault();
     try {
       setIsSubmitting(true);
-      const response = await signIn("credentials", {
-        redirect: false,
+      const response = await axios.post(`${baseUrl}/login`, {
         email: userName,
         password,
       });
+      if (response?.status === 200) {
+        setLoginToken(response?.data?.token);
 
-      if (response.ok) {
+        if (response?.data?.otp === 0) {
+          const otpRes = await axios.get(`${baseUrl}/sendotp`, {
+            params: {
+              email: userName,
+            },
+          });
+          if (otpRes.status === 200) {
+            setIsSubmitting(false);
+            setLoginOtpPopup(true);
+          }
+        } else {
+          localStorage.setItem("token", response.data.token);
+          setSuccessLogin(true);
+
+          const userResponse = await axios.get(`${baseUrl}/getUser`, {
+            headers: {
+              Authorization: `Bearer ${response?.data?.token}`,
+            },
+          });
+
+          const encryptedUserData = xorEncrypt(
+            JSON.stringify(userResponse.data),
+            "FameBusiness@214"
+          );
+          Cookies.set("%8564C%27", encryptedUserData, {
+            expires: 7,
+          });
+
+          await dispatch({ type: "LOGIN", payload: userResponse.data });
+          // setLoading(false);
+          setTimeout(() => {
+            setLoginOtpPopup(false);
+            window.location.reload();
+          }, 1000);
+        }
+      }
+    } catch (err) {
+      setError(err.response.data?.error);
+      setIsSubmitting(false);
+      setErrOpen(true);
+    }
+  };
+
+  const gLogin = useGoogleLogin({
+    onSuccess: (tokenResponse) => handleGoogleLogin(tokenResponse.access_token),
+  });
+  const handleGoogleLogin = React.useCallback(async (accessToken) => {
+    try {
+      const response = await fetch(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const creds = await response.json();
+
+      const formData = new FormData();
+
+      formData.append("user_name", creds?.name);
+      formData.append("email", creds?.email);
+      formData.append("password", creds?.name + "EWRjsdlk");
+      formData.append("phone", "-");
+      formData.append("role_id", 2);
+      formData.append("auth_type", "social");
+
+      const res = await axios.post(`${baseUrl}/signup`, formData);
+
+      localStorage.setItem("token", res.data.token);
+      setSuccessLogin(true);
+      setIsSubmitting(false);
+
+      const userResponse = await axios.get(`${baseUrl}/getUser`, {
+        headers: {
+          Authorization: `Bearer ${res.data.token}`,
+        },
+      });
+
+      const encryptedUserData = xorEncrypt(
+        JSON.stringify(userResponse.data),
+        "FameBusiness@214"
+      );
+      Cookies.set("%8564C%27", encryptedUserData, {
+        expires: 7,
+      });
+
+      await dispatch({ type: "LOGIN", payload: userResponse.data });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (err) {
+      console.log("ERROR HAPPENED now", err);
+      setError("Google Login Failed");
+      setIsSignSubmitting(false);
+      setErrOpen(true);
+    }
+  }, []);
+
+  const handleFacebookLogin = React.useCallback(async (response) => {
+    try {
+      // const response = await fetch(
+      //   "https://www.googleapis.com/oauth2/v3/userinfo",
+      //   {
+      //     headers: {
+      //       Authorization: `Bearer ${accessToken}`,
+      //     },
+      //   }
+      // );
+
+      const creds = response;
+
+      const formData = new FormData();
+
+      formData.append("user_name", creds?.name);
+      formData.append("email", creds?.email);
+      formData.append("password", creds?.name + "EWRjsdlk");
+      formData.append("phone", "-");
+      formData.append("role_id", 2);
+      formData.append("auth_type", "social");
+
+      const res = await axios.post(`${baseUrl}/signup`, formData);
+
+      localStorage.setItem("token", res.data.token);
+      setSuccessLogin(true);
+      setIsSubmitting(false);
+
+      const userResponse = await axios.get(`${baseUrl}/getUser`, {
+        headers: {
+          Authorization: `Bearer ${res.data.token}`,
+        },
+      });
+
+      const encryptedUserData = xorEncrypt(
+        JSON.stringify(userResponse.data),
+        "FameBusiness@214"
+      );
+      Cookies.set("%8564C%27", encryptedUserData, {
+        expires: 7,
+      });
+
+      await dispatch({ type: "LOGIN", payload: userResponse.data });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (err) {
+      console.log("ERROR HAPPENED now", err);
+      setError("Facebok Login Failed! Try Again");
+      setIsSignSubmitting(false);
+      setErrOpen(true);
+    }
+  }, []);
+
+  const [errOpen, setErrOpen] = React.useState(false);
+
+  const handleBarClose = (event, reason) => {
+    setUserName("");
+    setPassword("");
+    if (reason === "clickaway") {
+      return;
+    }
+
+    setErrOpen(false);
+  };
+
+  useScript(appleAuthHelpers.APPLE_SCRIPT_SRC);
+
+  const handleAppleLogin = async () => {
+    // const storedEmail = localStorage.getItem("apple_email");
+
+    // if (!storedEmail) {
+    try {
+      const response = await appleAuthHelpers.signIn({
+        authOptions: {
+          clientId: "com.famewheelsweb.app",
+          scope: "email name",
+          redirectURI: "https://www.famewheels.com",
+          state: "state",
+          nonce: "nonce",
+          usePopup: true,
+        },
+        onError: (error) =>
+          console.error("ERROR IN APPLE LOGIN PROMISE", error),
+      });
+
+      if (response) {
+        const data = jwtDecode(response?.authorization?.id_token);
+        const email = data?.email;
+
+        const formData = new FormData();
+
+        formData.append("user_name", "fame user");
+        formData.append("email", email);
+        formData.append("password", "EWRjsdlk");
+        formData.append("phone", "-");
+        formData.append("role_id", 2);
+        formData.append("auth_type", "social");
+
+        const res = await axios.post(`${baseUrl}/signup`, formData);
+
+        localStorage.setItem("token", res.data.token);
         setSuccessLogin(true);
+        setIsSubmitting(false);
 
-        // Fetch the user session to get the token
-        const session = await axios.get("/api/auth/session");
         const userResponse = await axios.get(`${baseUrl}/getUser`, {
           headers: {
-            Authorization: `Bearer ${session.data.token}`, // Ensure token is from session
+            Authorization: `Bearer ${res.data.token}`,
           },
         });
 
@@ -208,45 +396,66 @@ export default function NumberLogin() {
           JSON.stringify(userResponse.data),
           "FameBusiness@214"
         );
-        Cookies.set("%8564C%27", encryptedUserData, { expires: 7 });
+        Cookies.set("%8564C%27", encryptedUserData, {
+          expires: 7,
+        });
 
         await dispatch({ type: "LOGIN", payload: userResponse.data });
-        window.location.reload();
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       } else {
-        setError(response.error);
+        console.error("Error performing handleAppleLogin.");
       }
     } catch (err) {
-      setError("Login failed");
-    } finally {
-      setIsSubmitting(false);
+      console.error(err);
+      setError("Apple Login Failed");
+      setIsSignSubmitting(false);
+      setErrOpen(true);
     }
-  };
+    //   } else {
+    //     try {
+    //       const formData = new FormData();
 
-  const gLogin = useGoogleLogin({
-    onSuccess: (tokenResponse) => handleGoogleLogin(tokenResponse.access_token),
-  });
-  const handleGoogleLogin = async () => {
-    await signIn("google", { callbackUrl: "/" });
-  };
+    //       formData.append("user_name", "fame user");
+    //       formData.append("email", email);
+    //       formData.append("password", "EWRjsdlk");
+    //       formData.append("phone", "-");
+    //       formData.append("role_id", 2);
+    //       formData.append("auth_type", "social");
 
-  const [errOpen, setErrOpen] = useState(false);
+    //       const res = await axios.post(`${baseUrl}/signup`, formData);
 
-  const sendOTP = async (e) => {
-    e.preventDefault();
+    //       localStorage.setItem("token", res.data.token);
+    //       setSuccessLogin(true);
+    //       setIsSubmitting(false);
 
-    try {
-      const response = await axios.get(`${baseUrl}/sendotp`, {
-        params: {
-          login_type: "phone",
-          phone: phoneNo,
-        },
-      });
-      setOtpPopup(true);
-      setIsSubmitting(false);
-    } catch (error) {
-      setIsSubmitting(false);
-      console.error(error);
-    }
+    //       const userResponse = await axios.get(`${baseUrl}/getUser`, {
+    //         headers: {
+    //           Authorization: `Bearer ${res.data.token}`,
+    //         },
+    //       });
+
+    //       const encryptedUserData = xorEncrypt(
+    //         JSON.stringify(userResponse.data),
+    //         "FameBusiness@214"
+    //       );
+    //       Cookies.set("%8564C%27", encryptedUserData, {
+    //         expires: 7,
+    //       });
+
+    //       await dispatch({ type: "LOGIN", payload: userResponse.data });
+    //       // setLoading(false);
+    //       setTimeout(() => {
+    //         window.location.reload();
+    //       }, 1000);
+    //     } catch (err) {
+    //       console.error(err);
+    //       setError("Apple Login Failed");
+    //       setIsSignSubmitting(false);
+    //       setErrOpen(true);
+    //     }
+    //   }
   };
 
   return (
@@ -283,7 +492,7 @@ export default function NumberLogin() {
             </p>
 
             <form className="row px-2">
-              <div className="col-md-12 login_inputStyle">
+              <div className="col-md-12 login_inputStyle ">
                 <div className="input-group">
                   <span className="input-group-text" id="basic-addon1">
                     <i className="fa-solid fa-phone"></i>
@@ -305,15 +514,23 @@ export default function NumberLogin() {
               </div>
               <div className="col-12 p-0">
                 <button
-                  type="button"
+                  onClick={handleRegister}
+                  type="submit"
                   style={{ fontSize: 15 }}
                   className="btn py-2 mt-3 fw-btn rounded-3 model_loginBTn w-100"
-                  disabled={phoneNo.length !== 11 && !email}
-                  onClick={sendOTP}
-                  onChange={(e) => setPhoneNo(e.target.value)}
+                  disabled={phoneNo.length !== 11}
                 >
                   {isSubmitting ? (
-                    <CircularProgress size="16px" sx={{ color: "#fff" }} />
+                    <>
+                      <CircularProgress size="16px" sx={{ color: "#fff" }} />
+                    </>
+                  ) : successLogin ? (
+                    <img
+                      className="successAnim"
+                      src={SuccessTick}
+                      alt="success"
+                      srcSet=""
+                    />
                   ) : (
                     "Send OTP"
                   )}
@@ -346,7 +563,44 @@ export default function NumberLogin() {
                 Continue with Email
               </button>
             </div>
-            <div className="col-12 px-1 "></div>
+            <div className="col-12 px-1 ">
+              <FacebookLogin
+                appId={process.env.REACT_APP_FACEBOOK_APP_ID}
+                onSuccess={handleResponse}
+                onFail={handleError}
+                onProfileSuccess={handleSuccess}
+                // style={{
+                //   backgroundColor: "#4267b2",
+                //   color: "#fff",
+                //   fontSize: "16px",
+                //   padding: "10px 20px",
+                //   border: "none",
+                //   borderRadius: "4px",
+                //   cursor: "pointer",
+                // }}
+                className="btn  model_loginBTn w-100 border"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  x="0px"
+                  y="0px"
+                  width="20"
+                  height="20"
+                  className="me-2 mb-1"
+                  viewBox="0 0 48 48"
+                >
+                  <path
+                    fill="#3F51B5"
+                    d="M24 5A19 19 0 1 0 24 43A19 19 0 1 0 24 5Z"
+                  ></path>
+                  <path
+                    fill="#fff"
+                    d="M26.572,29.036h4.917l0.772-4.995h-5.69v-2.73c0-2.075,0.678-3.915,2.619-3.915h3.119v-4.359c-0.548-0.074-1.707-0.236-3.897-0.236c-4.573,0-7.254,2.415-7.254,7.917v3.323h-4.701v4.995h4.701v13.729C22.089,42.905,23.032,43,24,43c0.875,0,1.729-0.08,2.572-0.194V29.036z"
+                  ></path>
+                </svg>
+                Continue with Facebook
+              </FacebookLogin>
+            </div>
 
             <div className="col-12 px-1">
               <button
@@ -384,11 +638,42 @@ export default function NumberLogin() {
               </button>
             </div>
 
-            <div className="col-12 px-1"></div>
+            <div className="col-12 px-1">
+              <button
+                onClick={handleAppleLogin}
+                className="btn  model_loginBTn w-100 border"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  x="0px"
+                  y="0px"
+                  width="20"
+                  height="20"
+                  className="me-2 mb-1"
+                  viewBox="0 0 50 50"
+                >
+                  <path d="M 44.527344 34.75 C 43.449219 37.144531 42.929688 38.214844 41.542969 40.328125 C 39.601563 43.28125 36.863281 46.96875 33.480469 46.992188 C 30.46875 47.019531 29.691406 45.027344 25.601563 45.0625 C 21.515625 45.082031 20.664063 47.03125 17.648438 47 C 14.261719 46.96875 11.671875 43.648438 9.730469 40.699219 C 4.300781 32.429688 3.726563 22.734375 7.082031 17.578125 C 9.457031 13.921875 13.210938 11.773438 16.738281 11.773438 C 20.332031 11.773438 22.589844 13.746094 25.558594 13.746094 C 28.441406 13.746094 30.195313 11.769531 34.351563 11.769531 C 37.492188 11.769531 40.8125 13.480469 43.1875 16.433594 C 35.421875 20.691406 36.683594 31.78125 44.527344 34.75 Z M 31.195313 8.46875 C 32.707031 6.527344 33.855469 3.789063 33.4375 1 C 30.972656 1.167969 28.089844 2.742188 26.40625 4.78125 C 24.878906 6.640625 23.613281 9.398438 24.105469 12.066406 C 26.796875 12.152344 29.582031 10.546875 31.195313 8.46875 Z"></path>
+                </svg>
+                Continue with Apple
+              </button>
+            </div>
           </div>
         </>
       ) : loginViaEmail === 2 ? (
         <div className="px-2">
+          {/* <button
+            title="back"
+            onClick={() => setLoginViaEmail(1)}
+            className="btn  rounded-pill"
+            style={{
+              backgroundColor: "#ededed",
+              fontSize: "10px",
+              fontWeight: 500,
+            }}
+          >
+            <i class="fa-solid fa-chevron-left me-2 "></i>
+            Login with No.
+          </button> */}
           <h3
             style={{ textTransform: "unset" }}
             className="mb-0 text-black text-start fw-600 "
@@ -506,6 +791,19 @@ export default function NumberLogin() {
         </div>
       ) : (
         <div className="  px-2 ">
+          {/* <button
+            title="back"
+            onClick={() => setLoginViaEmail(1)}
+            className="btn  rounded-pill"
+            style={{
+              backgroundColor: "#ededed",
+              fontSize: "10px",
+              fontWeight: 500,
+            }}
+          >
+            <i class="fa-solid fa-chevron-left me-2 "></i>
+            Login with No.
+          </button> */}
           <h3
             style={{ textTransform: "unset" }}
             className="mb-0 text-black text-start fw-600 "
@@ -863,6 +1161,7 @@ export default function NumberLogin() {
     </>
   );
 }
+
 
 const VerifyOtp = ({ open, onClose, phone, password }) => {
   const [inputValues, setInputValues] = useState(["", "", "", "", "", ""]);

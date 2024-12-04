@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import React, { useState, useEffect, useContext } from "react";
 import axios from "axios";
 import sellThroughBid from "@/images/sellThroughBid.png";
@@ -15,7 +15,7 @@ import MembershipCard from "@/components/membershipBanner";
 import Image from "next/image";
 
 const LiveBidding = () => {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
   const { user } = useContext(AuthContext);
 
   const [isOpen, setIsOpen] = useState(false);
